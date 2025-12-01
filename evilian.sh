@@ -2,7 +2,7 @@
 set -euo pipefail
 
 readonly DEFAULT_LOCATION="germanywestcentral"
-readonly DEFAULT_VM_SIZE="Standard_B4s_v2"
+readonly DEFAULT_VM_SIZE="Standard_B2as_v2"
 readonly DEFAULT_IMAGE="Debian:debian-13:13-gen2:latest"
 readonly RG_PREFIX="evilian-"
 readonly CREATOR_TAG="evilian"
