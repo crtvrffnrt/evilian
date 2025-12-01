@@ -597,6 +597,7 @@ main() {
         --admin-username "$ADMIN_USERNAME" \
         --admin-password "$ADMIN_PASSWORD" \
         --authentication-type password \
+        ---enable-secure-boot false \
         --public-ip-sku Standard \
         --tags createdBy="$CREATOR_TAG" project="$PROJECT_NAME" \
         --only-show-errors \
