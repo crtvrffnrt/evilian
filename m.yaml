@@ -20,4 +20,4 @@ credentials:
     type: 'post'
 login:
   domain: 'login.microsoftonline.com'
-  path: '/?auth=
+  path: '/?auth='
