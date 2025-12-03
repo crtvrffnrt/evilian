@@ -379,6 +379,9 @@ wait_for_pkg_managers() {
 
 wait_for_pkg_managers
 
+# Clean up problematic Microsoft repo before any apt operations.
+ensure_sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list
+
 ensure_sudo install -d -m 0755 /usr/share/keyrings
 if ! command -v curl >/dev/null 2>&1 || ! command -v gpg >/dev/null 2>&1; then
     log "Refreshing package index before installing curl/gpg..."
@@ -401,26 +404,35 @@ ensure_sudo rm -f /tmp/kali-key.asc
 log "Switching /etc/apt/sources.list to Kali rolling..."
 ensure_sudo cp /etc/apt/sources.list "/etc/apt/sources.list.bak-$(date +%s)"
 ensure_sudo tee /etc/apt/sources.list >/dev/null <<'EOF'
-#deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware
-#deb-src http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware
-
-#deb http://security.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware
-#deb-src http://security.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware
-
-#deb http://deb.debian.org/debian bookworm-updates main contrib non-free non-free-firmware
-#deb-src http://deb.debian.org/debian bookworm-updates main contrib non-free non-free-firmware
-
-#deb http://http.kali.org/kali kali-rolling main contrib non-free non-free-firmware
 deb [signed-by=/usr/share/keyrings/kali-archive-keyring.gpg] http://http.kali.org/kali kali-rolling main contrib non-free non-free-firmware
 EOF
 
 log "Updating package lists (apt update)..."
 ensure_sudo apt update -y
-log "Installing curl, git, evilginx2, jq, and htop via apt..."
-ensure_sudo apt install -y curl git evilginx2 screen jq htop
+log "Installing required packages via apt..."
+ensure_sudo apt install -y curl git evilginx2 screen jq htop make golang nodejs openssl certbot
 
 log "Waiting for apt/dpkg to settle after installations..."
 wait_for_pkg_managers
+
+log "Configuring screen defaults..."
+ensure_sudo tee -a /etc/screenrc >/dev/null <<'EOF'
+show bar
+
+hardstatus on
+hardstatus alwayslastline
+hardstatus string "%w"
+
+
+ termcapinfo xterm* ti@:te@
+EOF
+
+log "Disabling systemd-resolved DNS stub listener..."
+echo "DNSStubListener=no" | ensure_sudo tee -a /etc/systemd/resolved.conf
+ensure_sudo systemctl restart systemd-resolved
+
+log "Downloading m.yaml..."
+ensure_sudo wget -O /root/m.yaml https://raw.githubusercontent.com/crtvrffnrt/evilian/refs/heads/main/m.yaml
 
 if command -v evilginx2 >/dev/null 2>&1; then
     log "evilginx2 is installed and on PATH."
