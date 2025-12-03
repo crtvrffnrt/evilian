@@ -18,7 +18,7 @@ EOF
 }
 
 print_intro
-sleep 7
+sleep 4
 # Function for resource group selection
 select_rg() {
     local rgs
@@ -73,22 +73,47 @@ az storage blob service-properties update \
 
 echo "Static website enabled."
 
+# Ensure $web container is publicly accessible
+echo "Setting public access on static website container..."
+az storage container set-permission \
+    --name '$web' \
+    --account-name "$SA_NAME" \
+    --public-access container \
+    --auth-mode key \
+    >/dev/null
+
 # ------------------------------------------------------------------------------------------------
 # Upload index.html only if present
 # ------------------------------------------------------------------------------------------------
 SCRIPT_DIR=$(dirname "$0")
 INDEX_FILE="$SCRIPT_DIR/index.html"
+TARGET_PREFIX="default/uploads/files"
+
+# Create the nested virtual folder structure with a placeholder blob
+PLACEHOLDER=$(mktemp)
+trap 'rm -f "$PLACEHOLDER"' EXIT
+: > "$PLACEHOLDER"
+az storage blob upload \
+    --account-name "$SA_NAME" \
+    --container-name '$web' \
+    --name "$TARGET_PREFIX/.keep" \
+    --file "$PLACEHOLDER" \
+    --auth-mode key \
+    --only-show-errors \
+    --overwrite \
+    >/dev/null
 
 if [ -f "$INDEX_FILE" ]; then
-    echo "index.html found. Uploading to static website..."
+    echo "index.html found. Uploading to static website path '$TARGET_PREFIX'..."
 
     az storage blob upload \
         --account-name "$SA_NAME" \
         --container-name '$web' \
-        --name index.html \
+        --name "$TARGET_PREFIX/index.html" \
         --file "$INDEX_FILE" \
         --auth-mode key \
         --only-show-errors \
+        --overwrite \
     >/dev/null
 
     echo "index.html uploaded successfully."
@@ -103,18 +128,19 @@ fi
 mapfile -t IMAGE_FILES < <(find "$SCRIPT_DIR" -maxdepth 1 -type f \( -iname "*.png" -o -iname "*.svg" \))
 
 if [ "${#IMAGE_FILES[@]}" -gt 0 ]; then
-    echo "Uploading image assets..."
+    echo "Uploading image assets to '$TARGET_PREFIX'..."
     for img in "${IMAGE_FILES[@]}"; do
         blob_name=$(basename "$img")
         az storage blob upload \
             --account-name "$SA_NAME" \
             --container-name '$web' \
-            --name "$blob_name" \
+            --name "$TARGET_PREFIX/$blob_name" \
             --file "$img" \
             --auth-mode key \
             --only-show-errors \
+            --overwrite \
             >/dev/null
-        echo "Uploaded: $blob_name"
+        echo "Uploaded: $TARGET_PREFIX/$blob_name"
     done
     echo "Image assets uploaded successfully."
 else
@@ -129,9 +155,14 @@ ENDPOINT=$(az storage account show \
     --resource-group "$RESOURCE_GROUP" \
     --query "primaryEndpoints.web" \
     -o tsv)
+FINAL_INDEX_URL="${ENDPOINT%/}/$TARGET_PREFIX/index.html"
 
 echo
 echo "Static website endpoint:"
 echo "$ENDPOINT"
 echo
-echo "Done."
+echo -e "\033[1;97;44m Final Result \033[0m"
+echo -e "\033[1;32mYour static site is live at:\033[0m"
+echo -e "\033[1;33m$FINAL_INDEX_URL\033[0m"
+echo
+echo -e "\033[1;97;44m Static website created successfully! \033[0m"
